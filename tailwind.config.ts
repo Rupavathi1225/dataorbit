@@ -13,6 +13,9 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ["DM Sans", "sans-serif"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -57,6 +60,12 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        popup: {
+          bg: "hsl(var(--popup-bg))",
+          border: "hsl(var(--popup-border))",
+        },
+        overlay: "hsl(var(--overlay-bg))",
+        glow: "hsl(var(--glow-primary))",
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -65,25 +74,24 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+      },
+      boxShadow: {
+        glow: "0 0 40px hsl(var(--glow-primary))",
+        popup: "0 25px 50px -12px hsl(var(--overlay-bg))",
+      },
+      backdropBlur: {
+        popup: "20px",
       },
     },
   },
