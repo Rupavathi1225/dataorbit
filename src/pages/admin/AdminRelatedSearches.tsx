@@ -12,6 +12,7 @@ interface RelatedSearch {
   title: string;
   position: number;
   blog_id: string;
+  web_result_page: number;
   blogs: { title: string } | null;
 }
 
@@ -32,6 +33,7 @@ const AdminRelatedSearches = () => {
     title: '',
     blog_id: '',
     position: '1',
+    web_result_page: '1',
   });
 
   const fetchData = async () => {
@@ -56,6 +58,7 @@ const AdminRelatedSearches = () => {
       title: formData.title,
       blog_id: formData.blog_id,
       position: parseInt(formData.position),
+      web_result_page: parseInt(formData.web_result_page),
     };
     
     if (editingSearch) {
@@ -92,6 +95,7 @@ const AdminRelatedSearches = () => {
       title: search.title,
       blog_id: search.blog_id,
       position: search.position.toString(),
+      web_result_page: search.web_result_page.toString(),
     });
     setIsDialogOpen(true);
   };
@@ -110,7 +114,7 @@ const AdminRelatedSearches = () => {
   };
 
   const resetForm = () => {
-    setFormData({ title: '', blog_id: '', position: '1' });
+    setFormData({ title: '', blog_id: '', position: '1', web_result_page: '1' });
     setEditingSearch(null);
   };
 
@@ -124,11 +128,11 @@ const AdminRelatedSearches = () => {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{editingSearch ? 'Edit Related Search' : 'Create New Related Search'}</DialogTitle>
+              <DialogTitle>{editingSearch ? 'Edit Related Search' : 'Add Related Search'}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="text-sm font-medium text-foreground">Select Blog</label>
+                <label className="text-sm font-medium text-foreground">Blog *</label>
                 <Select value={formData.blog_id} onValueChange={(v) => setFormData({ ...formData, blog_id: v })}>
                   <SelectTrigger><SelectValue placeholder="Select blog" /></SelectTrigger>
                   <SelectContent>
@@ -139,14 +143,48 @@ const AdminRelatedSearches = () => {
                 </Select>
               </div>
               <div>
-                <label className="text-sm font-medium text-foreground">Search Title</label>
-                <Input value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required />
+                <label className="text-sm font-medium text-foreground">Title (visible to users)</label>
+                <Input 
+                  value={formData.title} 
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })} 
+                  placeholder="e.g., Best Social Media Platforms 2024"
+                  required 
+                />
               </div>
-              <div>
-                <label className="text-sm font-medium text-foreground">Position</label>
-                <Input type="number" value={formData.position} onChange={(e) => setFormData({ ...formData, position: e.target.value })} min="1" />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-foreground">Web Result Page (1-4)</label>
+                  <Select value={formData.web_result_page} onValueChange={(v) => setFormData({ ...formData, web_result_page: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Page 1</SelectItem>
+                      <SelectItem value="2">Page 2</SelectItem>
+                      <SelectItem value="3">Page 3</SelectItem>
+                      <SelectItem value="4">Page 4</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground">Position (1-4)</label>
+                  <Select value={formData.position} onValueChange={(v) => setFormData({ ...formData, position: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Position 1</SelectItem>
+                      <SelectItem value="2">Position 2</SelectItem>
+                      <SelectItem value="3">Position 3</SelectItem>
+                      <SelectItem value="4">Position 4</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <Button type="submit" className="w-full">{editingSearch ? 'Update' : 'Create'}</Button>
+              <div className="flex gap-3 pt-4">
+                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="flex-1">
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1">
+                  {editingSearch ? 'Update' : 'Create'}
+                </Button>
+              </div>
             </form>
           </DialogContent>
         </Dialog>
@@ -163,6 +201,7 @@ const AdminRelatedSearches = () => {
               <tr>
                 <th className="text-left p-4 text-sm font-medium text-foreground">Title</th>
                 <th className="text-left p-4 text-sm font-medium text-foreground">Blog</th>
+                <th className="text-left p-4 text-sm font-medium text-foreground">Page</th>
                 <th className="text-left p-4 text-sm font-medium text-foreground">Position</th>
                 <th className="text-left p-4 text-sm font-medium text-foreground">Actions</th>
               </tr>
@@ -172,6 +211,7 @@ const AdminRelatedSearches = () => {
                 <tr key={search.id} className="border-t border-border">
                   <td className="p-4 text-sm text-foreground">{search.title}</td>
                   <td className="p-4 text-sm text-muted-foreground">{search.blogs?.title || '-'}</td>
+                  <td className="p-4 text-sm text-muted-foreground">Page {search.web_result_page}</td>
                   <td className="p-4 text-sm text-muted-foreground">{search.position}</td>
                   <td className="p-4">
                     <div className="flex gap-2">

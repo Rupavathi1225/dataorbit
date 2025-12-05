@@ -6,6 +6,7 @@ interface RelatedSearch {
   id: string;
   title: string;
   position: number;
+  web_result_page: number;
 }
 
 interface RelatedSearchesProps {
@@ -20,18 +21,21 @@ const RelatedSearches = ({ searches, blogId }: RelatedSearchesProps) => {
     await trackEvent('related_search_click', { 
       blogId, 
       relatedSearchId: search.id,
-      pageUrl: `/web-results/${search.id}`
+      pageUrl: `/wr=${search.web_result_page}`
     });
-    navigate(`/web-results/${search.id}`);
+    navigate(`/wr=${search.web_result_page}`);
   };
 
   if (searches.length === 0) return null;
+
+  // Limit to 4 related searches
+  const limitedSearches = searches.slice(0, 4);
 
   return (
     <div className="my-8">
       <p className="text-muted-foreground text-sm mb-4">Related searches</p>
       <div className="space-y-3">
-        {searches.map((search) => (
+        {limitedSearches.map((search) => (
           <button
             key={search.id}
             onClick={() => handleClick(search)}

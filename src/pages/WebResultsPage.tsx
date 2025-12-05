@@ -3,9 +3,11 @@ import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import RecentPosts from "@/components/RecentPosts";
-import { trackEvent } from "@/lib/tracking";
-import { ExternalLink } from "lucide-react";
+import { trackEvent, getSessionId } from "@/lib/tracking";
+import { ExternalLink, Mail } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
 
 interface WebResult {
   id: string;
@@ -16,12 +18,14 @@ interface WebResult {
   description: string | null;
   is_sponsored: boolean;
   position: number;
+  related_search_id: string;
 }
 
 interface RelatedSearch {
   id: string;
   title: string;
   blog_id: string;
+  web_result_page: number;
   blogs: { title: string; slug: string; categories: { slug: string } | null } | null;
 }
 
@@ -44,7 +48,10 @@ interface PreLandingConfig {
 }
 
 const WebResultsPage = () => {
-  const { searchId } = useParams<{ searchId: string }>();
+  const { page } = useParams<{ page: string }>();
+  const { toast } = useToast();
+  const pageNumber = parseInt(page || "1");
+  
   const [webResults, setWebResults] = useState<WebResult[]>([]);
   const [relatedSearch, setRelatedSearch] = useState<RelatedSearch | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,25 +59,29 @@ const WebResultsPage = () => {
   const [preLandingConfig, setPreLandingConfig] = useState<PreLandingConfig | null>(null);
   const [selectedResult, setSelectedResult] = useState<WebResult | null>(null);
   const [countdown, setCountdown] = useState(3);
+  const [email, setEmail] = useState("");
+  const [submittingEmail, setSubmittingEmail] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       
+      // Get related search by web_result_page number
       const { data: searchData } = await supabase
         .from('related_searches')
         .select('*, blogs(title, slug, categories(slug))')
-        .eq('id', searchId)
+        .eq('web_result_page', pageNumber)
         .maybeSingle();
       
       if (searchData) {
         setRelatedSearch(searchData as RelatedSearch);
-        await trackEvent('page_view', { relatedSearchId: searchId, pageUrl: window.location.pathname });
+        await trackEvent('page_view', { relatedSearchId: searchData.id, pageUrl: window.location.pathname });
         
+        // Get web results for this related search
         const { data: resultsData } = await supabase
           .from('web_results')
           .select('*')
-          .eq('related_search_id', searchId)
+          .eq('related_search_id', searchData.id)
           .order('is_sponsored', { ascending: false })
           .order('position');
         
@@ -81,11 +92,11 @@ const WebResultsPage = () => {
     };
     
     fetchData();
-  }, [searchId]);
+  }, [pageNumber]);
 
   const handleResultClick = async (result: WebResult) => {
     await trackEvent('web_result_click', { 
-      relatedSearchId: searchId, 
+      relatedSearchId: relatedSearch?.id, 
       webResultId: result.id,
       pageUrl: window.location.pathname
     });
@@ -115,6 +126,28 @@ const WebResultsPage = () => {
       window.open(selectedResult.url, '_blank');
       setShowPreLanding(false);
     }
+  };
+
+  const handleEmailSubmit = async (e: React.FormEvent, webResultId?: string) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    
+    setSubmittingEmail(true);
+    
+    const { error } = await supabase.from('email_submissions').insert({
+      email: email.trim(),
+      web_result_id: webResultId || null,
+      session_id: getSessionId(),
+    });
+    
+    if (error) {
+      toast({ title: 'Error', description: 'Failed to submit email', variant: 'destructive' });
+    } else {
+      toast({ title: 'Success', description: 'Email submitted successfully!' });
+      setEmail("");
+    }
+    
+    setSubmittingEmail(false);
   };
 
   useEffect(() => {
@@ -218,52 +251,67 @@ const WebResultsPage = () => {
         
         <h1 className="text-2xl font-bold text-white mb-8">Web Results</h1>
         
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
-            {sponsoredResults.length > 0 && (
-              <div className="bg-[#252545] rounded-xl p-6 mb-6">
-                {sponsoredResults.map((result) => (
-                  <div key={result.id} className="mb-6 last:mb-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      {result.logo && <img src={result.logo} alt={result.name} className="w-6 h-6 rounded" />}
-                      <span className="text-white/80 text-sm">{result.name}</span>
-                    </div>
-                    <p className="text-white/60 text-xs mb-1">Sponsored · {result.url}</p>
-                    <h3 className="text-primary font-medium text-lg mb-2">{result.title}</h3>
-                    {result.description && <p className="text-white/70 text-sm mb-3">{result.description}</p>}
-                    <button
-                      onClick={() => handleResultClick(result)}
-                      className="bg-primary text-white px-6 py-2 rounded-lg font-medium hover:bg-primary/90 transition-colors flex items-center gap-2"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      Visit Website
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            
-            <div className="space-y-4">
-              {normalResults.map((result) => (
-                <div 
-                  key={result.id} 
-                  className="bg-white/5 backdrop-blur rounded-lg p-4 hover:bg-white/10 transition-colors cursor-pointer"
-                  onClick={() => handleResultClick(result)}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    {result.logo && <img src={result.logo} alt={result.name} className="w-5 h-5 rounded" />}
+        <div className="max-w-3xl">
+          {/* Email Capture */}
+          <div className="bg-[#252545] rounded-xl p-6 mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <Mail className="w-5 h-5 text-primary" />
+              <h3 className="text-white font-semibold">Get notified about similar results</h3>
+            </div>
+            <form onSubmit={(e) => handleEmailSubmit(e)} className="flex gap-3">
+              <Input 
+                type="email" 
+                placeholder="Enter your email address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                required
+              />
+              <Button type="submit" disabled={submittingEmail}>
+                {submittingEmail ? 'Submitting...' : 'Subscribe'}
+              </Button>
+            </form>
+          </div>
+
+          {sponsoredResults.length > 0 && (
+            <div className="bg-[#252545] rounded-xl p-6 mb-6">
+              {sponsoredResults.map((result) => (
+                <div key={result.id} className="mb-6 last:mb-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    {result.logo && <img src={result.logo} alt={result.name} className="w-6 h-6 rounded" />}
                     <span className="text-white/80 text-sm">{result.name}</span>
                   </div>
-                  <p className="text-white/50 text-xs mb-1">{result.url}</p>
-                  <h3 className="text-primary font-medium mb-1">{result.title}</h3>
-                  {result.description && <p className="text-white/70 text-sm">{result.description}</p>}
+                  <p className="text-white/60 text-xs mb-1">Sponsored · {result.url}</p>
+                  <h3 className="text-primary font-medium text-lg mb-2">{result.title}</h3>
+                  {result.description && <p className="text-white/70 text-sm mb-3">{result.description}</p>}
+                  <button
+                    onClick={() => handleResultClick(result)}
+                    className="bg-primary text-white px-6 py-2 rounded-lg font-medium hover:bg-primary/90 transition-colors flex items-center gap-2"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Visit Website
+                  </button>
                 </div>
               ))}
             </div>
-          </div>
+          )}
           
-          <div className="lg:col-span-1">
-            <RecentPosts />
+          <div className="space-y-4">
+            {normalResults.map((result) => (
+              <div 
+                key={result.id} 
+                className="bg-white/5 backdrop-blur rounded-lg p-4 hover:bg-white/10 transition-colors cursor-pointer"
+                onClick={() => handleResultClick(result)}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  {result.logo && <img src={result.logo} alt={result.name} className="w-5 h-5 rounded" />}
+                  <span className="text-white/80 text-sm">{result.name}</span>
+                </div>
+                <p className="text-white/50 text-xs mb-1">{result.url}</p>
+                <h3 className="text-primary font-medium mb-1">{result.title}</h3>
+                {result.description && <p className="text-white/70 text-sm">{result.description}</p>}
+              </div>
+            ))}
           </div>
         </div>
       </main>
