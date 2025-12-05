@@ -25,6 +25,7 @@ interface RelatedSearch {
   id: string;
   title: string;
   position: number;
+  web_result_page: number;
 }
 
 const BlogPage = () => {

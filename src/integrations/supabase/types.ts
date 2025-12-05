@@ -210,6 +210,7 @@ export type Database = {
           id: string
           position: number | null
           title: string
+          web_result_page: number
         }
         Insert: {
           blog_id?: string | null
@@ -217,6 +218,7 @@ export type Database = {
           id?: string
           position?: number | null
           title: string
+          web_result_page?: number
         }
         Update: {
           blog_id?: string | null
@@ -224,6 +226,7 @@ export type Database = {
           id?: string
           position?: number | null
           title?: string
+          web_result_page?: number
         }
         Relationships: [
           {
