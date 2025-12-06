@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Edit, Trash2, Settings } from "lucide-react";
@@ -19,12 +19,13 @@ interface WebResult {
   is_sponsored: boolean;
   position: number;
   related_search_id: string;
-  related_searches: { title: string; blogs: { title: string } | null } | null;
+  related_searches: { title: string; web_result_page: number; blogs: { title: string } | null } | null;
 }
 
 interface RelatedSearch {
   id: string;
   title: string;
+  web_result_page: number;
   blogs: { title: string } | null;
 }
 
@@ -45,6 +46,7 @@ const AdminWebResults = () => {
     title: '',
     description: '',
     is_sponsored: false,
+    is_active: true,
     position: '1',
     related_search_id: '',
   });
@@ -66,8 +68,8 @@ const AdminWebResults = () => {
 
   const fetchData = async () => {
     const [resultsRes, searchesRes] = await Promise.all([
-      supabase.from('web_results').select('*, related_searches(title, blogs(title))').order('created_at', { ascending: false }),
-      supabase.from('related_searches').select('id, title, blogs(title)').order('created_at', { ascending: false }),
+      supabase.from('web_results').select('*, related_searches(title, web_result_page, blogs(title))').order('created_at', { ascending: false }),
+      supabase.from('related_searches').select('id, title, web_result_page, blogs(title)').order('created_at', { ascending: false }),
     ]);
     
     if (resultsRes.data) setResults(resultsRes.data as WebResult[]);
@@ -78,6 +80,8 @@ const AdminWebResults = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const selectedSearch = searches.find(s => s.id === formData.related_search_id);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -180,6 +184,7 @@ const AdminWebResults = () => {
       title: result.title,
       description: result.description || '',
       is_sponsored: result.is_sponsored,
+      is_active: true,
       position: result.position.toString(),
       related_search_id: result.related_search_id,
     });
@@ -194,7 +199,7 @@ const AdminWebResults = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', logo: '', url: '', title: '', description: '', is_sponsored: false, position: '1', related_search_id: '' });
+    setFormData({ name: '', logo: '', url: '', title: '', description: '', is_sponsored: false, is_active: true, position: '1', related_search_id: '' });
     setEditingResult(null);
   };
 
@@ -206,35 +211,125 @@ const AdminWebResults = () => {
           <DialogTrigger asChild>
             <Button><Plus className="w-4 h-4 mr-2" />Add Web Result</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>{editingResult ? 'Edit' : 'Create'} Web Result</DialogTitle></DialogHeader>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-background">
+            <DialogHeader><DialogTitle>{editingResult ? 'Edit' : 'Add'} Web Result</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Related Search */}
               <div>
-                <label className="text-sm font-medium text-foreground">Related Search</label>
+                <label className="text-sm font-medium text-foreground">Related Search *</label>
                 <Select value={formData.related_search_id} onValueChange={(v) => setFormData({ ...formData, related_search_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Select related search" /></SelectTrigger>
-                  <SelectContent>
+                  <SelectTrigger className="bg-background"><SelectValue placeholder="Select related search" /></SelectTrigger>
+                  <SelectContent className="bg-background z-50">
                     {searches.map((s) => (
                       <SelectItem key={s.id} value={s.id}>{s.blogs?.title} » {s.title}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div><label className="text-sm font-medium">Name</label><Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required /></div>
-                <div><label className="text-sm font-medium">Logo URL</label><Input value={formData.logo} onChange={(e) => setFormData({ ...formData, logo: e.target.value })} /></div>
+
+              {/* Title */}
+              <div>
+                <label className="text-sm font-medium text-foreground">Title *</label>
+                <Input 
+                  value={formData.title} 
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })} 
+                  placeholder="e.g., Best Social Media Platform 2024"
+                  required 
+                />
               </div>
-              <div><label className="text-sm font-medium">URL</label><Input value={formData.url} onChange={(e) => setFormData({ ...formData, url: e.target.value })} required /></div>
-              <div><label className="text-sm font-medium">Title</label><Input value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required /></div>
-              <div><label className="text-sm font-medium">Description</label><Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} /></div>
+
+              {/* Description */}
+              <div>
+                <label className="text-sm font-medium text-foreground">Description</label>
+                <Textarea 
+                  value={formData.description} 
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })} 
+                  placeholder="Short description of the web result..."
+                  rows={3}
+                />
+              </div>
+
+              {/* Logo URL */}
+              <div>
+                <label className="text-sm font-medium text-foreground">Logo URL</label>
+                <Input 
+                  value={formData.logo} 
+                  onChange={(e) => setFormData({ ...formData, logo: e.target.value })} 
+                  placeholder="https://example.com/logo.png"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Optional logo/icon to display with the web result</p>
+              </div>
+
+              {/* Target URL */}
+              <div>
+                <label className="text-sm font-medium text-foreground">Target URL *</label>
+                <Input 
+                  value={formData.url} 
+                  onChange={(e) => setFormData({ ...formData, url: e.target.value })} 
+                  placeholder="https://example.com/page"
+                  required 
+                />
+              </div>
+
+              {/* Name (domain name) */}
+              <div>
+                <label className="text-sm font-medium text-foreground">Name/Domain *</label>
+                <Input 
+                  value={formData.name} 
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
+                  placeholder="example.com"
+                  required 
+                />
+              </div>
+
+              {/* Page Number (Auto) and Position */}
               <div className="grid grid-cols-2 gap-4">
-                <div><label className="text-sm font-medium">Position</label><Input type="number" value={formData.position} onChange={(e) => setFormData({ ...formData, position: e.target.value })} min="1" /></div>
-                <div className="flex items-center gap-2 pt-6">
-                  <Switch checked={formData.is_sponsored} onCheckedChange={(c) => setFormData({ ...formData, is_sponsored: c })} />
-                  <label className="text-sm font-medium">Sponsored</label>
+                <div>
+                  <label className="text-sm font-medium text-foreground">Page Number (Auto)</label>
+                  <Input 
+                    value={selectedSearch ? `Page #${selectedSearch.web_result_page}` : 'Select search first'} 
+                    disabled
+                    className="bg-muted"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground">Position *</label>
+                  <Input 
+                    type="number" 
+                    value={formData.position} 
+                    onChange={(e) => setFormData({ ...formData, position: e.target.value })} 
+                    min="1" 
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">This result will appear at position #{formData.position}</p>
                 </div>
               </div>
-              <Button type="submit" className="w-full">{editingResult ? 'Update' : 'Create'}</Button>
+
+              {/* Checkboxes */}
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="is_active"
+                    checked={formData.is_active} 
+                    onCheckedChange={(c) => setFormData({ ...formData, is_active: c === true })} 
+                  />
+                  <label htmlFor="is_active" className="text-sm font-medium text-foreground">Active</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="is_sponsored"
+                    checked={formData.is_sponsored} 
+                    onCheckedChange={(c) => setFormData({ ...formData, is_sponsored: c === true })} 
+                  />
+                  <label htmlFor="is_sponsored" className="text-sm font-medium text-foreground">Sponsored Ad</label>
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-3 justify-end pt-4">
+                <Button type="button" variant="outline" onClick={() => { setIsDialogOpen(false); resetForm(); }}>Cancel</Button>
+                <Button type="submit">{editingResult ? 'Update' : 'Create'}</Button>
+              </div>
             </form>
           </DialogContent>
         </Dialog>
@@ -242,7 +337,7 @@ const AdminWebResults = () => {
 
       {/* Pre-landing Dialog */}
       <Dialog open={isPreLandingOpen} onOpenChange={setIsPreLandingOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-background">
           <DialogHeader><DialogTitle>Pre-Landing Page Config</DialogTitle></DialogHeader>
           <form onSubmit={handlePreLandingSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -275,18 +370,27 @@ const AdminWebResults = () => {
           <table className="w-full">
             <thead className="bg-muted">
               <tr>
-                <th className="text-left p-4 text-sm font-medium text-foreground">Name</th>
+                <th className="text-left p-4 text-sm font-medium text-foreground">Title</th>
                 <th className="text-left p-4 text-sm font-medium text-foreground">Related Search</th>
-                <th className="text-left p-4 text-sm font-medium text-foreground">Sponsored</th>
+                <th className="text-left p-4 text-sm font-medium text-foreground">Page</th>
+                <th className="text-left p-4 text-sm font-medium text-foreground">Type</th>
                 <th className="text-left p-4 text-sm font-medium text-foreground">Actions</th>
               </tr>
             </thead>
             <tbody>
               {results.map((result) => (
                 <tr key={result.id} className="border-t border-border">
-                  <td className="p-4 text-sm text-foreground">{result.name}</td>
-                  <td className="p-4 text-sm text-muted-foreground">{result.related_searches?.blogs?.title} » {result.related_searches?.title}</td>
-                  <td className="p-4"><span className={`text-xs px-2 py-1 rounded ${result.is_sponsored ? 'bg-green-500/20 text-green-600' : 'bg-muted text-muted-foreground'}`}>{result.is_sponsored ? 'Yes' : 'No'}</span></td>
+                  <td className="p-4">
+                    <div className="text-sm font-medium text-foreground">{result.name}</div>
+                    <div className="text-xs text-muted-foreground">{result.title}</div>
+                  </td>
+                  <td className="p-4 text-sm text-muted-foreground">{result.related_searches?.title}</td>
+                  <td className="p-4 text-sm text-muted-foreground">#{result.related_searches?.web_result_page}</td>
+                  <td className="p-4">
+                    <span className={`text-xs px-2 py-1 rounded ${result.is_sponsored ? 'bg-amber-100 text-amber-700' : 'bg-muted text-muted-foreground'}`}>
+                      {result.is_sponsored ? 'Sponsored' : 'Organic'}
+                    </span>
+                  </td>
                   <td className="p-4">
                     <div className="flex gap-2">
                       <Button variant="ghost" size="sm" onClick={() => openPreLanding(result)}><Settings className="w-4 h-4" /></Button>
