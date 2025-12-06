@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { trackEvent, getSessionId } from "@/lib/tracking";
-import { ExternalLink, Mail } from "lucide-react";
+import { ArrowLeft, Mail, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -55,6 +55,7 @@ const WebResultsPage = () => {
   const [webResults, setWebResults] = useState<WebResult[]>([]);
   const [relatedSearch, setRelatedSearch] = useState<RelatedSearch | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showEmailPopup, setShowEmailPopup] = useState(false);
   const [showPreLanding, setShowPreLanding] = useState(false);
   const [preLandingConfig, setPreLandingConfig] = useState<PreLandingConfig | null>(null);
   const [selectedResult, setSelectedResult] = useState<WebResult | null>(null);
@@ -66,7 +67,6 @@ const WebResultsPage = () => {
     const fetchData = async () => {
       setLoading(true);
       
-      // Get related search by web_result_page number
       const { data: searchData } = await supabase
         .from('related_searches')
         .select('*, blogs(title, slug, categories(slug))')
@@ -77,7 +77,6 @@ const WebResultsPage = () => {
         setRelatedSearch(searchData as RelatedSearch);
         await trackEvent('page_view', { relatedSearchId: searchData.id, pageUrl: window.location.pathname });
         
-        // Get web results for this related search
         const { data: resultsData } = await supabase
           .from('web_results')
           .select('*')
@@ -110,10 +109,42 @@ const WebResultsPage = () => {
     if (preLanding) {
       setPreLandingConfig(preLanding);
       setSelectedResult(result);
-      setCountdown(preLanding.countdown_seconds);
-      setShowPreLanding(true);
+      setShowEmailPopup(true);
     } else {
       window.open(result.url, '_blank');
+    }
+  };
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    
+    setSubmittingEmail(true);
+    
+    const { error } = await supabase.from('email_submissions').insert({
+      email: email.trim(),
+      web_result_id: selectedResult?.id || null,
+      session_id: getSessionId(),
+    });
+    
+    if (error) {
+      toast({ title: 'Error', description: 'Failed to submit email', variant: 'destructive' });
+      setSubmittingEmail(false);
+      return;
+    }
+    
+    await trackEvent('email_submitted', { 
+      webResultId: selectedResult?.id,
+      pageUrl: window.location.pathname
+    });
+    
+    setEmail("");
+    setSubmittingEmail(false);
+    setShowEmailPopup(false);
+    
+    if (preLandingConfig) {
+      setCountdown(preLandingConfig.countdown_seconds);
+      setShowPreLanding(true);
     }
   };
 
@@ -125,29 +156,9 @@ const WebResultsPage = () => {
       });
       window.open(selectedResult.url, '_blank');
       setShowPreLanding(false);
+      setSelectedResult(null);
+      setPreLandingConfig(null);
     }
-  };
-
-  const handleEmailSubmit = async (e: React.FormEvent, webResultId?: string) => {
-    e.preventDefault();
-    if (!email.trim()) return;
-    
-    setSubmittingEmail(true);
-    
-    const { error } = await supabase.from('email_submissions').insert({
-      email: email.trim(),
-      web_result_id: webResultId || null,
-      session_id: getSessionId(),
-    });
-    
-    if (error) {
-      toast({ title: 'Error', description: 'Failed to submit email', variant: 'destructive' });
-    } else {
-      toast({ title: 'Success', description: 'Email submitted successfully!' });
-      setEmail("");
-    }
-    
-    setSubmittingEmail(false);
   };
 
   useEffect(() => {
@@ -159,26 +170,77 @@ const WebResultsPage = () => {
 
   const sponsoredResults = webResults.filter(r => r.is_sponsored);
   const normalResults = webResults.filter(r => !r.is_sponsored);
+  const totalResults = webResults.length;
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#1a1a2e]">
-        <Header />
-        <main className="container mx-auto px-4 py-12">
+      <div className="min-h-screen bg-background">
+        <main className="container mx-auto px-4 py-8 max-w-3xl">
           <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-white/10 rounded w-1/2" />
-            <div className="space-y-4">
+            <div className="h-4 bg-muted rounded w-24" />
+            <div className="h-8 bg-muted rounded w-2/3" />
+            <div className="h-4 bg-muted rounded w-32" />
+            <div className="space-y-6 mt-8">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-32 bg-white/10 rounded" />
+                <div key={i} className="space-y-2">
+                  <div className="h-4 bg-muted rounded w-40" />
+                  <div className="h-5 bg-muted rounded w-48" />
+                  <div className="h-4 bg-muted rounded w-full" />
+                </div>
               ))}
             </div>
           </div>
         </main>
-        <Footer />
       </div>
     );
   }
 
+  // Email Popup
+  if (showEmailPopup && selectedResult) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <div className="bg-background rounded-xl p-6 max-w-md w-full relative shadow-2xl">
+          <button 
+            onClick={() => {
+              setShowEmailPopup(false);
+              setSelectedResult(null);
+              setPreLandingConfig(null);
+            }}
+            className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+              <Mail className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground">Subscribe to continue</h3>
+              <p className="text-sm text-muted-foreground">Get exclusive updates and offers</p>
+            </div>
+          </div>
+          
+          <form onSubmit={handleEmailSubmit} className="space-y-4">
+            <Input 
+              type="email" 
+              placeholder="Enter your email address"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full"
+              required
+              autoFocus
+            />
+            <Button type="submit" disabled={submittingEmail} className="w-full">
+              {submittingEmail ? 'Submitting...' : 'Continue'}
+            </Button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Pre-landing page
   if (showPreLanding && preLandingConfig) {
     return (
       <div 
@@ -231,7 +293,14 @@ const WebResultsPage = () => {
           {countdown > 0 ? `Please wait ${countdown}s...` : preLandingConfig.button_text}
         </button>
         
-        <button onClick={() => setShowPreLanding(false)} className="mt-4 text-white/60 hover:text-white text-sm">
+        <button 
+          onClick={() => {
+            setShowPreLanding(false);
+            setSelectedResult(null);
+            setPreLandingConfig(null);
+          }} 
+          className="mt-4 text-white/60 hover:text-white text-sm"
+        >
           Go back
         </button>
       </div>
@@ -239,80 +308,75 @@ const WebResultsPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#1a1a2e]">
+    <div className="min-h-screen bg-background">
       <Header />
       
-      <main className="container mx-auto px-4 py-12">
-        {relatedSearch?.blogs && (
-          <p className="text-white/60 text-sm mb-6">
-            DataOrbit » {relatedSearch.blogs.title} » {relatedSearch.title}
-          </p>
-        )}
+      <main className="container mx-auto px-4 py-8 max-w-3xl">
+        <Link to="/" className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground text-sm mb-6">
+          <ArrowLeft className="w-4 h-4" />
+          Back to Home
+        </Link>
         
-        <h1 className="text-2xl font-bold text-white mb-8">Web Results</h1>
+        <h1 className="text-xl font-bold text-foreground mb-1">
+          Results for: {relatedSearch?.title || 'Search'}
+        </h1>
+        <p className="text-sm text-muted-foreground mb-8">
+          {totalResults} result{totalResults !== 1 ? 's' : ''} found
+        </p>
         
-        <div className="max-w-3xl">
-          {/* Email Capture */}
-          <div className="bg-[#252545] rounded-xl p-6 mb-8">
-            <div className="flex items-center gap-3 mb-4">
-              <Mail className="w-5 h-5 text-primary" />
-              <h3 className="text-white font-semibold">Get notified about similar results</h3>
-            </div>
-            <form onSubmit={(e) => handleEmailSubmit(e)} className="flex gap-3">
-              <Input 
-                type="email" 
-                placeholder="Enter your email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
-                required
-              />
-              <Button type="submit" disabled={submittingEmail}>
-                {submittingEmail ? 'Submitting...' : 'Subscribe'}
-              </Button>
-            </form>
-          </div>
-
-          {sponsoredResults.length > 0 && (
-            <div className="bg-[#252545] rounded-xl p-6 mb-6">
-              {sponsoredResults.map((result) => (
-                <div key={result.id} className="mb-6 last:mb-0">
-                  <div className="flex items-center gap-2 mb-2">
-                    {result.logo && <img src={result.logo} alt={result.name} className="w-6 h-6 rounded" />}
-                    <span className="text-white/80 text-sm">{result.name}</span>
+        <div className="space-y-6">
+          {/* Sponsored Results */}
+          {sponsoredResults.map((result) => (
+            <div key={result.id} className="group">
+              <div className="flex items-center gap-2 mb-1">
+                {result.logo ? (
+                  <img src={result.logo} alt={result.name} className="w-5 h-5 rounded" />
+                ) : (
+                  <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
+                    {result.name.charAt(0)}
                   </div>
-                  <p className="text-white/60 text-xs mb-1">Sponsored · {result.url}</p>
-                  <h3 className="text-primary font-medium text-lg mb-2">{result.title}</h3>
-                  {result.description && <p className="text-white/70 text-sm mb-3">{result.description}</p>}
-                  <button
-                    onClick={() => handleResultClick(result)}
-                    className="bg-primary text-white px-6 py-2 rounded-lg font-medium hover:bg-primary/90 transition-colors flex items-center gap-2"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    Visit Website
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          
-          <div className="space-y-4">
-            {normalResults.map((result) => (
-              <div 
-                key={result.id} 
-                className="bg-white/5 backdrop-blur rounded-lg p-4 hover:bg-white/10 transition-colors cursor-pointer"
-                onClick={() => handleResultClick(result)}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  {result.logo && <img src={result.logo} alt={result.name} className="w-5 h-5 rounded" />}
-                  <span className="text-white/80 text-sm">{result.name}</span>
-                </div>
-                <p className="text-white/50 text-xs mb-1">{result.url}</p>
-                <h3 className="text-primary font-medium mb-1">{result.title}</h3>
-                {result.description && <p className="text-white/70 text-sm">{result.description}</p>}
+                )}
+                <span className="text-foreground text-sm">{result.name}</span>
+                <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">AD</span>
               </div>
-            ))}
-          </div>
+              <p className="text-xs text-muted-foreground mb-1">{result.url}</p>
+              <button
+                onClick={() => handleResultClick(result)}
+                className="text-primary hover:underline font-medium text-left"
+              >
+                {result.title}
+              </button>
+              {result.description && (
+                <p className="text-sm text-muted-foreground mt-1">{result.description}</p>
+              )}
+            </div>
+          ))}
+
+          {/* Normal Results */}
+          {normalResults.map((result) => (
+            <div key={result.id} className="group">
+              <div className="flex items-center gap-2 mb-1">
+                {result.logo ? (
+                  <img src={result.logo} alt={result.name} className="w-5 h-5 rounded" />
+                ) : (
+                  <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
+                    {result.name.charAt(0)}
+                  </div>
+                )}
+                <span className="text-foreground text-sm">{result.name}</span>
+              </div>
+              <p className="text-xs text-muted-foreground mb-1">{result.url}</p>
+              <button
+                onClick={() => handleResultClick(result)}
+                className="text-primary hover:underline font-medium text-left"
+              >
+                {result.title}
+              </button>
+              {result.description && (
+                <p className="text-sm text-muted-foreground mt-1">{result.description}</p>
+              )}
+            </div>
+          ))}
         </div>
       </main>
       
