@@ -75,10 +75,8 @@ const Index = () => {
               <BlogCard
                 key={blog.id}
                 id={blog.id}
-                serialNumber={blog.serial_number}
                 title={blog.title}
                 slug={blog.slug}
-                excerpt={blog.content.substring(0, 150) + '...'}
                 featuredImage={blog.featured_image}
                 author={blog.author}
                 publishedAt={blog.published_at}

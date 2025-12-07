@@ -172,6 +172,11 @@ const WebResultsPage = () => {
   const normalResults = webResults.filter(r => !r.is_sponsored);
   const totalResults = webResults.length;
 
+  // Generate masked URL for display
+  const getMaskedUrl = (index: number) => {
+    return `dataorbit.lid${index + 1}`;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -326,7 +331,7 @@ const WebResultsPage = () => {
         
         <div className="space-y-6">
           {/* Sponsored Results */}
-          {sponsoredResults.map((result) => (
+          {sponsoredResults.map((result, index) => (
             <div key={result.id} className="group">
               <div className="flex items-center gap-2 mb-1">
                 {result.logo ? (
@@ -336,10 +341,10 @@ const WebResultsPage = () => {
                     {result.name.charAt(0)}
                   </div>
                 )}
-                <span className="text-foreground text-sm">{result.name}</span>
+                <span className="text-foreground text-sm">{getMaskedUrl(index)}</span>
                 <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">AD</span>
               </div>
-              <p className="text-xs text-muted-foreground mb-1">{result.url}</p>
+              <p className="text-xs text-muted-foreground mb-1">https://{getMaskedUrl(index)}</p>
               <button
                 onClick={() => handleResultClick(result)}
                 className="text-primary hover:underline font-medium text-left"
@@ -353,7 +358,7 @@ const WebResultsPage = () => {
           ))}
 
           {/* Normal Results */}
-          {normalResults.map((result) => (
+          {normalResults.map((result, index) => (
             <div key={result.id} className="group">
               <div className="flex items-center gap-2 mb-1">
                 {result.logo ? (
@@ -363,9 +368,9 @@ const WebResultsPage = () => {
                     {result.name.charAt(0)}
                   </div>
                 )}
-                <span className="text-foreground text-sm">{result.name}</span>
+                <span className="text-foreground text-sm">{getMaskedUrl(sponsoredResults.length + index)}</span>
               </div>
-              <p className="text-xs text-muted-foreground mb-1">{result.url}</p>
+              <p className="text-xs text-muted-foreground mb-1">https://{getMaskedUrl(sponsoredResults.length + index)}</p>
               <button
                 onClick={() => handleResultClick(result)}
                 className="text-primary hover:underline font-medium text-left"
