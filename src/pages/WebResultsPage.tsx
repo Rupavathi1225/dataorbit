@@ -341,10 +341,14 @@ const WebResultsPage = () => {
                     {result.name.charAt(0)}
                   </div>
                 )}
-                <span className="text-foreground text-sm">{result.name}</span>
+                <button
+                  onClick={() => handleResultClick(result)}
+                  className="text-foreground text-sm hover:underline"
+                >
+                  https://{getMaskedUrl(index)}
+                </button>
                 <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">AD</span>
               </div>
-              <p className="text-xs text-muted-foreground mb-1">https://{getMaskedUrl(index)}</p>
               <button
                 onClick={() => handleResultClick(result)}
                 className="text-primary hover:underline font-medium text-left"
@@ -368,9 +372,13 @@ const WebResultsPage = () => {
                     {result.name.charAt(0)}
                   </div>
                 )}
-                <span className="text-foreground text-sm">{result.name}</span>
+                <button
+                  onClick={() => handleResultClick(result)}
+                  className="text-foreground text-sm hover:underline"
+                >
+                  https://{getMaskedUrl(sponsoredResults.length + index)}
+                </button>
               </div>
-              <p className="text-xs text-muted-foreground mb-1">https://{getMaskedUrl(sponsoredResults.length + index)}</p>
               <button
                 onClick={() => handleResultClick(result)}
                 className="text-primary hover:underline font-medium text-left"
