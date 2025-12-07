@@ -4,10 +4,8 @@ import { trackEvent } from "@/lib/tracking";
 
 interface BlogCardProps {
   id: string;
-  serialNumber: number;
   title: string;
   slug: string;
-  excerpt: string;
   featuredImage: string;
   author: string;
   publishedAt: string;
@@ -17,10 +15,8 @@ interface BlogCardProps {
 
 const BlogCard = ({
   id,
-  serialNumber,
   title,
   slug,
-  excerpt,
   featuredImage,
   author,
   publishedAt,
@@ -43,16 +39,12 @@ const BlogCard = ({
           alt={title}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         />
-        <span className="absolute top-3 left-3 bg-primary text-primary-foreground text-xs font-medium px-2 py-1 rounded">
-          #{serialNumber}
-        </span>
       </div>
       <div className="p-5">
         <span className="text-primary text-sm font-medium">{categoryName}</span>
-        <h3 className="text-foreground font-semibold text-lg mt-1 mb-2 line-clamp-2 group-hover:text-primary transition-colors">
+        <h3 className="text-foreground font-semibold text-lg mt-1 mb-4 line-clamp-2 group-hover:text-primary transition-colors">
           {title}
         </h3>
-        <p className="text-muted-foreground text-sm line-clamp-2 mb-4">{excerpt}</p>
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
