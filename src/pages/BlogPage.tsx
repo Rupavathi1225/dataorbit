@@ -117,14 +117,6 @@ const BlogPage = () => {
           />
           
           <RelatedSearches searches={relatedSearches} blogId={blog.id} />
-          
-          <article className="prose prose-lg max-w-none">
-            {blog.content.split('\n').map((paragraph, i) => (
-              <p key={i} className="mb-4 text-foreground/90 leading-relaxed">
-                {paragraph}
-              </p>
-            ))}
-          </article>
         </div>
       </main>
       

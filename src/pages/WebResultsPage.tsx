@@ -341,7 +341,7 @@ const WebResultsPage = () => {
                     {result.name.charAt(0)}
                   </div>
                 )}
-                <span className="text-foreground text-sm">{getMaskedUrl(index)}</span>
+                <span className="text-foreground text-sm">{result.name}</span>
                 <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">AD</span>
               </div>
               <p className="text-xs text-muted-foreground mb-1">https://{getMaskedUrl(index)}</p>
@@ -368,7 +368,7 @@ const WebResultsPage = () => {
                     {result.name.charAt(0)}
                   </div>
                 )}
-                <span className="text-foreground text-sm">{getMaskedUrl(sponsoredResults.length + index)}</span>
+                <span className="text-foreground text-sm">{result.name}</span>
               </div>
               <p className="text-xs text-muted-foreground mb-1">https://{getMaskedUrl(sponsoredResults.length + index)}</p>
               <button
