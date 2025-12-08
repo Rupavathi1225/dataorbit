@@ -329,68 +329,77 @@ const WebResultsPage = () => {
           {totalResults} result{totalResults !== 1 ? 's' : ''} found
         </p>
         
-        <div className="space-y-6">
-          {/* Sponsored Results */}
-          {sponsoredResults.map((result, index) => (
-            <div key={result.id} className="group">
-              <div className="flex items-center gap-2 mb-1">
-                {result.logo ? (
-                  <img src={result.logo} alt={result.name} className="w-5 h-5 rounded" />
-                ) : (
-                  <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
-                    {result.name.charAt(0)}
-                  </div>
-                )}
+        {/* Sponsored Results - Dark Theme */}
+        {sponsoredResults.length > 0 && (
+          <div className="bg-[#1a1a2e] rounded-xl p-6 mb-8 space-y-6">
+            {sponsoredResults.map((result, index) => (
+              <div key={result.id} className="group">
                 <button
                   onClick={() => handleResultClick(result)}
-                  className="text-foreground text-sm hover:underline"
+                  className="text-[#7c9ec9] hover:underline font-medium text-left block underline"
                 >
-                  https://{getMaskedUrl(index)}
+                  {result.title}
                 </button>
-                <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">AD</span>
-              </div>
-              <button
-                onClick={() => handleResultClick(result)}
-                className="text-primary hover:underline font-medium text-left"
-              >
-                {result.title}
-              </button>
-              {result.description && (
-                <p className="text-sm text-muted-foreground mt-1">{result.description}</p>
-              )}
-            </div>
-          ))}
-
-          {/* Normal Results */}
-          {normalResults.map((result, index) => (
-            <div key={result.id} className="group">
-              <div className="flex items-center gap-2 mb-1">
-                {result.logo ? (
-                  <img src={result.logo} alt={result.name} className="w-5 h-5 rounded" />
-                ) : (
-                  <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
-                    {result.name.charAt(0)}
-                  </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs text-gray-400">Sponsored</span>
+                  <span className="text-gray-500">·</span>
+                  <button
+                    onClick={() => handleResultClick(result)}
+                    className="text-gray-400 text-sm hover:underline"
+                  >
+                    https://{getMaskedUrl(index)}/
+                  </button>
+                  <span className="text-gray-500">:</span>
+                </div>
+                {result.description && (
+                  <p className="text-sm text-[#b8a88a] italic mt-2">{result.description}</p>
                 )}
+                <Button
+                  onClick={() => handleResultClick(result)}
+                  className="mt-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
+                >
+                  ➤ Visit Website
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Normal Results - White/Light Theme */}
+        {normalResults.length > 0 && (
+          <div className="space-y-6">
+            <h2 className="text-sm text-muted-foreground font-medium">Web Results</h2>
+            {normalResults.map((result, index) => (
+              <div key={result.id} className="group">
+                <div className="flex items-center gap-2 mb-1">
+                  {result.logo ? (
+                    <img src={result.logo} alt={result.name} className="w-5 h-5 rounded" />
+                  ) : (
+                    <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
+                      {result.name.charAt(0)}
+                    </div>
+                  )}
+                  <span className="text-foreground text-sm">{getMaskedUrl(sponsoredResults.length + index)}</span>
+                </div>
                 <button
                   onClick={() => handleResultClick(result)}
-                  className="text-foreground text-sm hover:underline"
+                  className="text-gray-500 text-sm hover:underline block"
                 >
                   https://{getMaskedUrl(sponsoredResults.length + index)}
                 </button>
+                <button
+                  onClick={() => handleResultClick(result)}
+                  className="text-primary hover:underline font-medium text-left block mt-1"
+                >
+                  {result.title}
+                </button>
+                {result.description && (
+                  <p className="text-sm text-muted-foreground mt-1">{result.description}</p>
+                )}
               </div>
-              <button
-                onClick={() => handleResultClick(result)}
-                className="text-primary hover:underline font-medium text-left"
-              >
-                {result.title}
-              </button>
-              {result.description && (
-                <p className="text-sm text-muted-foreground mt-1">{result.description}</p>
-              )}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </main>
       
       <Footer />
