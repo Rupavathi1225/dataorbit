@@ -48,9 +48,8 @@ interface PreLandingConfig {
 }
 
 const WebResultsPage = () => {
-  const { page } = useParams<{ page: string }>();
+  const { searchId } = useParams<{ searchId: string }>();
   const { toast } = useToast();
-  const pageNumber = parseInt(page || "1");
   
   const [webResults, setWebResults] = useState<WebResult[]>([]);
   const [relatedSearch, setRelatedSearch] = useState<RelatedSearch | null>(null);
@@ -65,12 +64,17 @@ const WebResultsPage = () => {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!searchId) {
+        setLoading(false);
+        return;
+      }
+      
       setLoading(true);
       
       const { data: searchData } = await supabase
         .from('related_searches')
         .select('*, blogs(title, slug, categories(slug))')
-        .eq('web_result_page', pageNumber)
+        .eq('id', searchId)
         .maybeSingle();
       
       if (searchData) {
@@ -91,7 +95,7 @@ const WebResultsPage = () => {
     };
     
     fetchData();
-  }, [pageNumber]);
+  }, [searchId]);
 
   const handleResultClick = async (result: WebResult) => {
     await trackEvent('web_result_click', { 
