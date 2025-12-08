@@ -98,32 +98,8 @@ const BlogPage = () => {
       
       <main className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content */}
-          <div className="lg:col-span-2">
-            <div className="mb-6">
-              <span className="inline-block bg-muted text-muted-foreground text-sm px-3 py-1 rounded-full">
-                {blog.categories?.name}
-              </span>
-              <span className="text-muted-foreground text-sm ml-3">
-                • {new Date(blog.published_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-              </span>
-            </div>
-            
-            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-8 leading-tight">
-              {blog.title}
-            </h1>
-            
-            <img 
-              src={blog.featured_image} 
-              alt={blog.title}
-              className="w-full rounded-xl mb-8 aspect-video object-cover"
-            />
-            
-            <RelatedSearches searches={relatedSearches} blogId={blog.id} />
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
+          {/* Sidebar - Left */}
+          <div className="space-y-6 order-2 lg:order-1">
             {/* Author Card */}
             <div className="bg-card rounded-xl p-6 border border-border">
               <div className="flex items-center gap-4 mb-4">
@@ -150,6 +126,30 @@ const BlogPage = () => {
 
             {/* Recent Posts */}
             <RecentPosts />
+          </div>
+
+          {/* Main Content - Right */}
+          <div className="lg:col-span-2 order-1 lg:order-2">
+            <div className="mb-6">
+              <span className="inline-block bg-muted text-muted-foreground text-sm px-3 py-1 rounded-full">
+                {blog.categories?.name}
+              </span>
+              <span className="text-muted-foreground text-sm ml-3">
+                • {new Date(blog.published_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              </span>
+            </div>
+            
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-8 leading-tight">
+              {blog.title}
+            </h1>
+            
+            <img 
+              src={blog.featured_image} 
+              alt={blog.title}
+              className="w-full rounded-xl mb-8 aspect-video object-cover"
+            />
+            
+            <RelatedSearches searches={relatedSearches} blogId={blog.id} />
           </div>
         </div>
       </main>
