@@ -22,7 +22,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/category/:categorySlug" element={<CategoryPage />} />
           <Route path="/blog/:categorySlug/:slug" element={<BlogPage />} />
-          <Route path="/wr/:page" element={<WebResultsPage />} />
+          <Route path="/wr/:searchId" element={<WebResultsPage />} />
           
           {/* Admin Route - Single page with tabs */}
           <Route path="/admin" element={<AdminLayout />} />

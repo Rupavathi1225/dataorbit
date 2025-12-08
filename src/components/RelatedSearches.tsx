@@ -21,9 +21,9 @@ const RelatedSearches = ({ searches, blogId }: RelatedSearchesProps) => {
     await trackEvent('related_search_click', { 
       blogId, 
       relatedSearchId: search.id,
-      pageUrl: `/wr/${search.web_result_page}`
+      pageUrl: `/wr/${search.id}`
     });
-    navigate(`/wr/${search.web_result_page}`);
+    navigate(`/wr/${search.id}`);
   };
 
   if (searches.length === 0) return null;
