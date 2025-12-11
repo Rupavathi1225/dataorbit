@@ -5,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, Sparkles, ImageIcon, Loader2 } from "lucide-react";
+import { Plus, Edit, Trash2, Sparkles, ImageIcon, Loader2, Download, Copy, CheckCircle, XCircle } from "lucide-react";
 
 interface Blog {
   id: string;
@@ -39,6 +40,9 @@ const AdminBlogs = () => {
   const [editingBlog, setEditingBlog] = useState<Blog | null>(null);
   const [generatingContent, setGeneratingContent] = useState(false);
   const [generatingImage, setGeneratingImage] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [generatedRelatedSearches, setGeneratedRelatedSearches] = useState<string[]>([]);
+  const [selectedRelatedSearches, setSelectedRelatedSearches] = useState<number[]>([]);
   
   const [formData, setFormData] = useState({
     title: '',
@@ -91,7 +95,11 @@ const AdminBlogs = () => {
       
       if (data.content) {
         setFormData(prev => ({ ...prev, content: data.content }));
-        toast({ title: 'Success', description: 'Content generated successfully' });
+        if (data.relatedSearches && data.relatedSearches.length > 0) {
+          setGeneratedRelatedSearches(data.relatedSearches);
+          setSelectedRelatedSearches([0, 1, 2, 3].filter(i => i < data.relatedSearches.length));
+        }
+        toast({ title: 'Success', description: 'Content and related searches generated' });
       } else if (data.error) {
         throw new Error(data.error);
       }
@@ -139,6 +147,16 @@ const AdminBlogs = () => {
     }
   };
 
+  const toggleRelatedSearch = (index: number) => {
+    if (selectedRelatedSearches.includes(index)) {
+      setSelectedRelatedSearches(prev => prev.filter(i => i !== index));
+    } else if (selectedRelatedSearches.length < 4) {
+      setSelectedRelatedSearches(prev => [...prev, index]);
+    } else {
+      toast({ title: 'Limit', description: 'You can select maximum 4 related searches', variant: 'destructive' });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -169,11 +187,23 @@ const AdminBlogs = () => {
         fetchData();
       }
     } else {
-      const { error } = await supabase.from('blogs').insert(blogData);
+      const { data: newBlog, error } = await supabase.from('blogs').insert(blogData).select().single();
       
       if (error) {
         toast({ title: 'Error', description: error.message, variant: 'destructive' });
       } else {
+        // Create selected related searches
+        if (newBlog && selectedRelatedSearches.length > 0) {
+          const relatedSearchesToCreate = selectedRelatedSearches.map((idx, position) => ({
+            title: generatedRelatedSearches[idx],
+            blog_id: newBlog.id,
+            position: position + 1,
+            web_result_page: position + 1, // /wr=1, /wr=2, etc.
+          }));
+          
+          await supabase.from('related_searches').insert(relatedSearchesToCreate);
+        }
+        
         toast({ title: 'Success', description: 'Blog created successfully' });
         setIsDialogOpen(false);
         fetchData();
@@ -196,6 +226,8 @@ const AdminBlogs = () => {
       category_id: blog.category_id?.toString() || '',
       status: blog.status,
     });
+    setGeneratedRelatedSearches([]);
+    setSelectedRelatedSearches([]);
     setIsDialogOpen(true);
   };
 
@@ -208,6 +240,7 @@ const AdminBlogs = () => {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } else {
       toast({ title: 'Success', description: 'Blog deleted successfully' });
+      setSelectedIds(prev => prev.filter(i => i !== id));
       fetchData();
     }
   };
@@ -225,6 +258,77 @@ const AdminBlogs = () => {
       status: 'draft',
     });
     setEditingBlog(null);
+    setGeneratedRelatedSearches([]);
+    setSelectedRelatedSearches([]);
+  };
+
+  // Bulk actions
+  const toggleSelectAll = () => {
+    if (selectedIds.length === blogs.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(blogs.map(b => b.id));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const getBaseUrl = () => {
+    return window.location.origin;
+  };
+
+  const copyLinks = () => {
+    const selectedBlogs = blogs.filter(b => selectedIds.includes(b.id));
+    const links = selectedBlogs.map(b => `${getBaseUrl()}/blog/${b.slug}`).join('\n');
+    navigator.clipboard.writeText(links);
+    toast({ title: 'Copied', description: `${selectedBlogs.length} link(s) copied to clipboard` });
+  };
+
+  const exportCSV = (all: boolean) => {
+    const dataToExport = all ? blogs : blogs.filter(b => selectedIds.includes(b.id));
+    const headers = ['Serial #', 'Title', 'Slug', 'Author', 'Category', 'Status', 'Link'];
+    const rows = dataToExport.map(b => [
+      b.serial_number,
+      b.title,
+      b.slug,
+      b.author,
+      b.categories?.name || '',
+      b.status,
+      `${getBaseUrl()}/blog/${b.slug}`
+    ]);
+    
+    const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${c}"`).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `blogs_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    toast({ title: 'Exported', description: `${dataToExport.length} blog(s) exported` });
+  };
+
+  const bulkUpdateStatus = async (status: string) => {
+    const { error } = await supabase.from('blogs').update({ status }).in('id', selectedIds);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Success', description: `${selectedIds.length} blog(s) ${status === 'published' ? 'activated' : 'deactivated'}` });
+      fetchData();
+    }
+  };
+
+  const bulkDelete = async () => {
+    if (!confirm(`Are you sure you want to delete ${selectedIds.length} blog(s)?`)) return;
+    const { error } = await supabase.from('blogs').delete().in('id', selectedIds);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Success', description: `${selectedIds.length} blog(s) deleted` });
+      setSelectedIds([]);
+      fetchData();
+    }
   };
 
   return (
@@ -265,7 +369,7 @@ const AdminBlogs = () => {
               </div>
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="text-sm font-medium text-foreground">Content *</label>
+                  <label className="text-sm font-medium text-foreground">Content * (100 words)</label>
                   <Button 
                     type="button" 
                     variant="outline" 
@@ -285,11 +389,44 @@ const AdminBlogs = () => {
                 <Textarea 
                   value={formData.content} 
                   onChange={(e) => setFormData({ ...formData, content: e.target.value })} 
-                  rows={8} 
+                  rows={6} 
                   required 
-                  placeholder="Enter blog content or generate with AI..."
+                  placeholder="Enter blog content or generate with AI (100 words)..."
                 />
               </div>
+
+              {/* Generated Related Searches */}
+              {generatedRelatedSearches.length > 0 && (
+                <div className="border border-border rounded-lg p-4 bg-muted/50">
+                  <label className="text-sm font-medium text-foreground block mb-2">
+                    Select Related Searches (max 4) - Click to select/deselect
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {generatedRelatedSearches.map((search, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => toggleRelatedSearch(index)}
+                        className={`p-2 text-sm rounded-md border text-left transition-colors ${
+                          selectedRelatedSearches.includes(index)
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-background border-border hover:bg-muted'
+                        }`}
+                      >
+                        <span className="font-medium mr-1">#{selectedRelatedSearches.indexOf(index) + 1 || '-'}</span>
+                        {search}
+                        {selectedRelatedSearches.includes(index) && (
+                          <span className="ml-1 text-xs">→ /wr={selectedRelatedSearches.indexOf(index) + 1}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Selected: {selectedRelatedSearches.length}/4
+                  </p>
+                </div>
+              )}
+
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-sm font-medium text-foreground">Featured Image</label>
@@ -350,6 +487,33 @@ const AdminBlogs = () => {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Bulk Actions Bar */}
+      {selectedIds.length > 0 && (
+        <div className="mb-4 p-3 bg-muted rounded-lg flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-medium">{selectedIds.length} of {blogs.length} selected</span>
+          <div className="flex gap-2 ml-auto flex-wrap">
+            <Button variant="outline" size="sm" onClick={() => exportCSV(true)}>
+              <Download className="w-4 h-4 mr-1" />Export All CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => exportCSV(false)}>
+              <Download className="w-4 h-4 mr-1" />Export Selected ({selectedIds.length})
+            </Button>
+            <Button variant="outline" size="sm" onClick={copyLinks}>
+              <Copy className="w-4 h-4 mr-1" />Copy
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => bulkUpdateStatus('published')}>
+              <CheckCircle className="w-4 h-4 mr-1" />Activate
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => bulkUpdateStatus('draft')}>
+              <XCircle className="w-4 h-4 mr-1" />Deactivate
+            </Button>
+            <Button variant="destructive" size="sm" onClick={bulkDelete}>
+              <Trash2 className="w-4 h-4 mr-1" />Delete ({selectedIds.length})
+            </Button>
+          </div>
+        </div>
+      )}
       
       {loading ? (
         <div className="space-y-4">
@@ -360,6 +524,12 @@ const AdminBlogs = () => {
           <table className="w-full">
             <thead className="bg-muted">
               <tr>
+                <th className="p-4 w-12">
+                  <Checkbox 
+                    checked={selectedIds.length === blogs.length && blogs.length > 0}
+                    onCheckedChange={toggleSelectAll}
+                  />
+                </th>
                 <th className="text-left p-4 text-sm font-medium text-foreground">#</th>
                 <th className="text-left p-4 text-sm font-medium text-foreground">Title</th>
                 <th className="text-left p-4 text-sm font-medium text-foreground">Category</th>
@@ -371,6 +541,12 @@ const AdminBlogs = () => {
             <tbody>
               {blogs.map((blog) => (
                 <tr key={blog.id} className="border-t border-border">
+                  <td className="p-4">
+                    <Checkbox 
+                      checked={selectedIds.includes(blog.id)}
+                      onCheckedChange={() => toggleSelect(blog.id)}
+                    />
+                  </td>
                   <td className="p-4 text-sm text-muted-foreground">{blog.serial_number}</td>
                   <td className="p-4 text-sm text-foreground">{blog.title}</td>
                   <td className="p-4 text-sm text-muted-foreground">{blog.categories?.name || '-'}</td>

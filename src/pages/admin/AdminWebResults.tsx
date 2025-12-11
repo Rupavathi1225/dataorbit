@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, Settings } from "lucide-react";
+import { Plus, Edit, Trash2, Settings, Download, Copy, CheckCircle, XCircle } from "lucide-react";
 
 interface WebResult {
   id: string;
@@ -38,6 +38,7 @@ const AdminWebResults = () => {
   const [isPreLandingOpen, setIsPreLandingOpen] = useState(false);
   const [editingResult, setEditingResult] = useState<WebResult | null>(null);
   const [selectedResultForPreLanding, setSelectedResultForPreLanding] = useState<WebResult | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -195,12 +196,85 @@ const AdminWebResults = () => {
     if (!confirm('Are you sure?')) return;
     const { error } = await supabase.from('web_results').delete().eq('id', id);
     if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    else { toast({ title: 'Success', description: 'Web result deleted' }); fetchData(); }
+    else { 
+      toast({ title: 'Success', description: 'Web result deleted' }); 
+      setSelectedIds(prev => prev.filter(i => i !== id));
+      fetchData(); 
+    }
   };
 
   const resetForm = () => {
     setFormData({ name: '', logo: '', url: '', title: '', description: '', is_sponsored: false, is_active: true, position: '1', related_search_id: '' });
     setEditingResult(null);
+  };
+
+  // Bulk actions
+  const toggleSelectAll = () => {
+    if (selectedIds.length === results.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(results.map(r => r.id));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const getBaseUrl = () => {
+    return window.location.origin;
+  };
+
+  const copyLinks = () => {
+    const selectedResults = results.filter(r => selectedIds.includes(r.id));
+    const links = selectedResults.map(r => r.url).join('\n');
+    navigator.clipboard.writeText(links);
+    toast({ title: 'Copied', description: `${selectedResults.length} link(s) copied to clipboard` });
+  };
+
+  const exportCSV = (all: boolean) => {
+    const dataToExport = all ? results : results.filter(r => selectedIds.includes(r.id));
+    const headers = ['Title', 'Name', 'URL', 'Related Search', 'Page', 'Position', 'Type'];
+    const rows = dataToExport.map(r => [
+      r.title,
+      r.name,
+      r.url,
+      r.related_searches?.title || '',
+      r.related_searches?.web_result_page || '',
+      r.position,
+      r.is_sponsored ? 'Sponsored' : 'Organic'
+    ]);
+    
+    const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${c}"`).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `web_results_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    toast({ title: 'Exported', description: `${dataToExport.length} web result(s) exported` });
+  };
+
+  const bulkUpdateSponsored = async (isSponsored: boolean) => {
+    const { error } = await supabase.from('web_results').update({ is_sponsored: isSponsored }).in('id', selectedIds);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Success', description: `${selectedIds.length} web result(s) ${isSponsored ? 'activated as sponsored' : 'set as organic'}` });
+      fetchData();
+    }
+  };
+
+  const bulkDelete = async () => {
+    if (!confirm(`Are you sure you want to delete ${selectedIds.length} web result(s)?`)) return;
+    const { error } = await supabase.from('web_results').delete().in('id', selectedIds);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Success', description: `${selectedIds.length} web result(s) deleted` });
+      setSelectedIds([]);
+      fetchData();
+    }
   };
 
   return (
@@ -214,7 +288,6 @@ const AdminWebResults = () => {
           <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-background">
             <DialogHeader><DialogTitle>{editingResult ? 'Edit' : 'Add'} Web Result</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Related Search */}
               <div>
                 <label className="text-sm font-medium text-foreground">Related Search *</label>
                 <Select value={formData.related_search_id} onValueChange={(v) => setFormData({ ...formData, related_search_id: v })}>
@@ -227,7 +300,6 @@ const AdminWebResults = () => {
                 </Select>
               </div>
 
-              {/* Title */}
               <div>
                 <label className="text-sm font-medium text-foreground">Title *</label>
                 <Input 
@@ -238,7 +310,6 @@ const AdminWebResults = () => {
                 />
               </div>
 
-              {/* Description */}
               <div>
                 <label className="text-sm font-medium text-foreground">Description</label>
                 <Textarea 
@@ -249,7 +320,6 @@ const AdminWebResults = () => {
                 />
               </div>
 
-              {/* Logo URL */}
               <div>
                 <label className="text-sm font-medium text-foreground">Logo URL</label>
                 <Input 
@@ -257,10 +327,8 @@ const AdminWebResults = () => {
                   onChange={(e) => setFormData({ ...formData, logo: e.target.value })} 
                   placeholder="https://example.com/logo.png"
                 />
-                <p className="text-xs text-muted-foreground mt-1">Optional logo/icon to display with the web result</p>
               </div>
 
-              {/* Target URL */}
               <div>
                 <label className="text-sm font-medium text-foreground">Target URL *</label>
                 <Input 
@@ -271,7 +339,6 @@ const AdminWebResults = () => {
                 />
               </div>
 
-              {/* Name (domain name) */}
               <div>
                 <label className="text-sm font-medium text-foreground">Name/Domain *</label>
                 <Input 
@@ -282,7 +349,6 @@ const AdminWebResults = () => {
                 />
               </div>
 
-              {/* Page Number (Auto) and Position */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-foreground">Page Number (Auto)</label>
@@ -301,11 +367,9 @@ const AdminWebResults = () => {
                     min="1" 
                     required
                   />
-                  <p className="text-xs text-muted-foreground mt-1">This result will appear at position #{formData.position}</p>
                 </div>
               </div>
 
-              {/* Checkboxes */}
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
                   <Checkbox 
@@ -325,7 +389,6 @@ const AdminWebResults = () => {
                 </div>
               </div>
 
-              {/* Buttons */}
               <div className="flex gap-3 justify-end pt-4">
                 <Button type="button" variant="outline" onClick={() => { setIsDialogOpen(false); resetForm(); }}>Cancel</Button>
                 <Button type="submit">{editingResult ? 'Update' : 'Create'}</Button>
@@ -362,6 +425,33 @@ const AdminWebResults = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Actions Bar */}
+      {selectedIds.length > 0 && (
+        <div className="mb-4 p-3 bg-muted rounded-lg flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-medium">{selectedIds.length} of {results.length} selected</span>
+          <div className="flex gap-2 ml-auto flex-wrap">
+            <Button variant="outline" size="sm" onClick={() => exportCSV(true)}>
+              <Download className="w-4 h-4 mr-1" />Export All CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => exportCSV(false)}>
+              <Download className="w-4 h-4 mr-1" />Export Selected ({selectedIds.length})
+            </Button>
+            <Button variant="outline" size="sm" onClick={copyLinks}>
+              <Copy className="w-4 h-4 mr-1" />Copy
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => bulkUpdateSponsored(true)}>
+              <CheckCircle className="w-4 h-4 mr-1" />Activate
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => bulkUpdateSponsored(false)}>
+              <XCircle className="w-4 h-4 mr-1" />Deactivate
+            </Button>
+            <Button variant="destructive" size="sm" onClick={bulkDelete}>
+              <Trash2 className="w-4 h-4 mr-1" />Delete ({selectedIds.length})
+            </Button>
+          </div>
+        </div>
+      )}
       
       {loading ? (
         <div className="space-y-4">{[1, 2, 3].map((i) => <div key={i} className="h-16 bg-muted rounded-lg animate-pulse" />)}</div>
@@ -370,6 +460,12 @@ const AdminWebResults = () => {
           <table className="w-full">
             <thead className="bg-muted">
               <tr>
+                <th className="p-4 w-12">
+                  <Checkbox 
+                    checked={selectedIds.length === results.length && results.length > 0}
+                    onCheckedChange={toggleSelectAll}
+                  />
+                </th>
                 <th className="text-left p-4 text-sm font-medium text-foreground">Title</th>
                 <th className="text-left p-4 text-sm font-medium text-foreground">Related Search</th>
                 <th className="text-left p-4 text-sm font-medium text-foreground">Page</th>
@@ -381,13 +477,16 @@ const AdminWebResults = () => {
               {results.map((result) => (
                 <tr key={result.id} className="border-t border-border">
                   <td className="p-4">
-                    <div className="text-sm font-medium text-foreground">{result.name}</div>
-                    <div className="text-xs text-muted-foreground">{result.title}</div>
+                    <Checkbox 
+                      checked={selectedIds.includes(result.id)}
+                      onCheckedChange={() => toggleSelect(result.id)}
+                    />
                   </td>
-                  <td className="p-4 text-sm text-muted-foreground">{result.related_searches?.title}</td>
-                  <td className="p-4 text-sm text-muted-foreground">#{result.related_searches?.web_result_page}</td>
+                  <td className="p-4 text-sm text-foreground">{result.title}</td>
+                  <td className="p-4 text-sm text-muted-foreground">{result.related_searches?.title || '-'}</td>
+                  <td className="p-4 text-sm text-muted-foreground">Page {result.related_searches?.web_result_page || '-'}</td>
                   <td className="p-4">
-                    <span className={`text-xs px-2 py-1 rounded ${result.is_sponsored ? 'bg-amber-100 text-amber-700' : 'bg-muted text-muted-foreground'}`}>
+                    <span className={`text-xs px-2 py-1 rounded ${result.is_sponsored ? 'bg-blue-500/20 text-blue-600' : 'bg-gray-500/20 text-gray-600'}`}>
                       {result.is_sponsored ? 'Sponsored' : 'Organic'}
                     </span>
                   </td>
