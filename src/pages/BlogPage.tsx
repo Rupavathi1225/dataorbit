@@ -29,19 +29,24 @@ interface RelatedSearch {
 }
 
 const BlogPage = () => {
-  const { slug } = useParams<{ slug: string }>();
+  const { slug, categorySlug } = useParams<{ slug?: string; categorySlug?: string }>();
   const [blog, setBlog] = useState<Blog | null>(null);
   const [relatedSearches, setRelatedSearches] = useState<RelatedSearch[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Handle both /blog/:slug and /blog/:categorySlug/:slug routes
+  const blogSlug = slug || categorySlug;
+
   useEffect(() => {
     const fetchData = async () => {
+      if (!blogSlug) return;
+      
       setLoading(true);
       
       const { data: blogData } = await supabase
         .from('blogs')
         .select('*, categories(name, slug)')
-        .eq('slug', slug)
+        .eq('slug', blogSlug)
         .eq('status', 'published')
         .maybeSingle();
       
@@ -62,7 +67,7 @@ const BlogPage = () => {
     };
     
     fetchData();
-  }, [slug]);
+  }, [blogSlug]);
 
   if (loading) {
     return (
