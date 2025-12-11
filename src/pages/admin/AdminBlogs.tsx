@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2, Sparkles, ImageIcon, Loader2 } from "lucide-react";
 
 interface Blog {
   id: string;
@@ -37,12 +37,14 @@ const AdminBlogs = () => {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingBlog, setEditingBlog] = useState<Blog | null>(null);
+  const [generatingContent, setGeneratingContent] = useState(false);
+  const [generatingImage, setGeneratingImage] = useState(false);
   
   const [formData, setFormData] = useState({
     title: '',
     slug: '',
     content: '',
-    featured_image: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=800',
+    featured_image: '',
     author: '',
     author_bio: '',
     author_image: '',
@@ -73,6 +75,70 @@ const AdminBlogs = () => {
     setFormData({ ...formData, title, slug: generateSlug(title) });
   };
 
+  const generateContent = async () => {
+    if (!formData.title.trim()) {
+      toast({ title: 'Error', description: 'Please enter a title first', variant: 'destructive' });
+      return;
+    }
+
+    setGeneratingContent(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-blog-content', {
+        body: { title: formData.title, slug: formData.slug, type: 'content' }
+      });
+
+      if (error) throw error;
+      
+      if (data.content) {
+        setFormData(prev => ({ ...prev, content: data.content }));
+        toast({ title: 'Success', description: 'Content generated successfully' });
+      } else if (data.error) {
+        throw new Error(data.error);
+      }
+    } catch (error: any) {
+      console.error('Error generating content:', error);
+      toast({ 
+        title: 'Error', 
+        description: error.message || 'Failed to generate content', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setGeneratingContent(false);
+    }
+  };
+
+  const generateImage = async () => {
+    if (!formData.title.trim()) {
+      toast({ title: 'Error', description: 'Please enter a title first', variant: 'destructive' });
+      return;
+    }
+
+    setGeneratingImage(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-blog-content', {
+        body: { title: formData.title, slug: formData.slug, type: 'image' }
+      });
+
+      if (error) throw error;
+      
+      if (data.imageUrl) {
+        setFormData(prev => ({ ...prev, featured_image: data.imageUrl }));
+        toast({ title: 'Success', description: 'Image generated successfully' });
+      } else if (data.error) {
+        throw new Error(data.error);
+      }
+    } catch (error: any) {
+      console.error('Error generating image:', error);
+      toast({ 
+        title: 'Error', 
+        description: error.message || 'Failed to generate image', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setGeneratingImage(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -80,7 +146,7 @@ const AdminBlogs = () => {
       title: formData.title,
       slug: formData.slug,
       content: formData.content,
-      featured_image: formData.featured_image,
+      featured_image: formData.featured_image || null,
       author: formData.author,
       author_bio: formData.author_bio || null,
       author_image: formData.author_image || null,
@@ -123,7 +189,7 @@ const AdminBlogs = () => {
       title: blog.title,
       slug: blog.slug,
       content: blog.content,
-      featured_image: blog.featured_image,
+      featured_image: blog.featured_image || '',
       author: blog.author,
       author_bio: blog.author_bio || '',
       author_image: blog.author_image || '',
@@ -151,7 +217,7 @@ const AdminBlogs = () => {
       title: '',
       slug: '',
       content: '',
-      featured_image: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=800',
+      featured_image: '',
       author: '',
       author_bio: '',
       author_image: '',
@@ -175,12 +241,16 @@ const AdminBlogs = () => {
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="text-sm font-medium text-foreground">Title</label>
+                <label className="text-sm font-medium text-foreground">Title *</label>
                 <Input value={formData.title} onChange={(e) => handleTitleChange(e.target.value)} required />
               </div>
               <div>
-                <label className="text-sm font-medium text-foreground">Slug</label>
+                <label className="text-sm font-medium text-foreground">Slug *</label>
                 <Input value={formData.slug} onChange={(e) => setFormData({ ...formData, slug: e.target.value })} required />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-foreground">Author</label>
+                <Input value={formData.author} onChange={(e) => setFormData({ ...formData, author: e.target.value })} />
               </div>
               <div>
                 <label className="text-sm font-medium text-foreground">Category</label>
@@ -194,36 +264,86 @@ const AdminBlogs = () => {
                 </Select>
               </div>
               <div>
-                <label className="text-sm font-medium text-foreground">Content</label>
-                <Textarea value={formData.content} onChange={(e) => setFormData({ ...formData, content: e.target.value })} rows={8} required />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-sm font-medium text-foreground">Content *</label>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={generateContent}
+                    disabled={generatingContent || !formData.title.trim()}
+                    className="gap-1"
+                  >
+                    {generatingContent ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4" />
+                    )}
+                    Generate AI Content
+                  </Button>
+                </div>
+                <Textarea 
+                  value={formData.content} 
+                  onChange={(e) => setFormData({ ...formData, content: e.target.value })} 
+                  rows={8} 
+                  required 
+                  placeholder="Enter blog content or generate with AI..."
+                />
               </div>
               <div>
-                <label className="text-sm font-medium text-foreground">Featured Image URL</label>
-                <Input value={formData.featured_image} onChange={(e) => setFormData({ ...formData, featured_image: e.target.value })} />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-sm font-medium text-foreground">Featured Image</label>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={generateImage}
+                    disabled={generatingImage || !formData.title.trim()}
+                    className="gap-1"
+                  >
+                    {generatingImage ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <ImageIcon className="w-4 h-4" />
+                    )}
+                    Generate AI Image
+                  </Button>
+                </div>
+                <Input 
+                  value={formData.featured_image} 
+                  onChange={(e) => setFormData({ ...formData, featured_image: e.target.value })} 
+                  placeholder="Or paste image URL here..."
+                />
+                {formData.featured_image && (
+                  <div className="mt-2 rounded-lg overflow-hidden border border-border">
+                    <img 
+                      src={formData.featured_image} 
+                      alt="Featured preview" 
+                      className="w-full h-40 object-cover"
+                      onError={(e) => (e.currentTarget.style.display = 'none')}
+                    />
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-foreground">Author Name</label>
-                  <Input value={formData.author} onChange={(e) => setFormData({ ...formData, author: e.target.value })} required />
-                </div>
-                <div>
                   <label className="text-sm font-medium text-foreground">Author Image URL</label>
                   <Input value={formData.author_image} onChange={(e) => setFormData({ ...formData, author_image: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground">Status</label>
+                  <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="draft">Draft</SelectItem>
+                      <SelectItem value="published">Published</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <div>
                 <label className="text-sm font-medium text-foreground">Author Bio</label>
                 <Textarea value={formData.author_bio} onChange={(e) => setFormData({ ...formData, author_bio: e.target.value })} rows={2} />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-foreground">Status</label>
-                <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="published">Published</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
               <Button type="submit" className="w-full">{editingBlog ? 'Update Blog' : 'Create Blog'}</Button>
             </form>
