@@ -143,11 +143,20 @@ const BlogPage = () => {
               {blog.title}
             </h1>
             
-            <img 
-              src={blog.featured_image} 
-              alt={blog.title}
-              className="w-full rounded-xl mb-8 aspect-video object-cover"
-            />
+            {blog.featured_image && (
+              <img 
+                src={blog.featured_image} 
+                alt={blog.title}
+                className="w-full rounded-xl mb-8 aspect-video object-cover"
+              />
+            )}
+            
+            {/* Blog Content */}
+            <article className="prose prose-lg max-w-none text-foreground mb-8">
+              <div className="whitespace-pre-wrap leading-relaxed">
+                {blog.content}
+              </div>
+            </article>
             
             <RelatedSearches searches={relatedSearches} blogId={blog.id} />
           </div>
