@@ -44,11 +44,11 @@ serve(async (req) => {
           messages: [
             {
               role: 'system',
-              content: 'You are a professional blog content writer. Write engaging, informative, and well-structured blog posts. Use HTML formatting with proper headings (h2, h3), paragraphs, lists, and emphasis where appropriate. The content should be SEO-friendly and around 800-1200 words.'
+              content: 'You are a professional blog content writer. Write engaging, informative, and well-structured blog posts in plain text format. Do NOT use any HTML tags like <p>, <h1>, <h2>, <h3>, <ul>, <li>, etc. Use simple line breaks and plain text formatting only. The content should be SEO-friendly and around 800-1200 words.'
             },
             {
               role: 'user',
-              content: `Write a comprehensive blog post about: "${title}". Make it informative, engaging, and valuable for readers. Include an introduction, main body with subheadings, and a conclusion.`
+              content: `Write a comprehensive blog post about: "${title}". Make it informative, engaging, and valuable for readers. Include an introduction, main body with clear sections, and a conclusion. Use plain text only - no HTML tags.`
             }
           ],
         }),
