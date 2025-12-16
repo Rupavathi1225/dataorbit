@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, Sparkles, ImageIcon, Loader2, Download, Copy, CheckCircle, XCircle } from "lucide-react";
+import { Plus, Edit, Trash2, Sparkles, ImageIcon, Loader2, Download, Copy, CheckCircle, XCircle, ExternalLink } from "lucide-react";
 
 interface Blog {
   id: string;
@@ -97,6 +97,7 @@ const AdminBlogs = () => {
         setFormData(prev => ({ ...prev, content: data.content }));
         if (data.relatedSearches && data.relatedSearches.length > 0) {
           setGeneratedRelatedSearches(data.relatedSearches);
+          // Auto-select first 4
           setSelectedRelatedSearches([0, 1, 2, 3].filter(i => i < data.relatedSearches.length));
         }
         toast({ title: 'Success', description: 'Content and related searches generated' });
@@ -157,6 +158,12 @@ const AdminBlogs = () => {
     }
   };
 
+  const updateRelatedSearch = (index: number, value: string) => {
+    const updated = [...generatedRelatedSearches];
+    updated[index] = value;
+    setGeneratedRelatedSearches(updated);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -192,9 +199,11 @@ const AdminBlogs = () => {
       if (error) {
         toast({ title: 'Error', description: error.message, variant: 'destructive' });
       } else {
-        // Create selected related searches
+        // Create selected related searches with correct order
         if (newBlog && selectedRelatedSearches.length > 0) {
-          const relatedSearchesToCreate = selectedRelatedSearches.map((idx, position) => ({
+          // Sort selected indexes to maintain order 1,2,3,4
+          const sortedSelected = [...selectedRelatedSearches].sort((a, b) => a - b);
+          const relatedSearchesToCreate = sortedSelected.map((idx, position) => ({
             title: generatedRelatedSearches[idx],
             blog_id: newBlog.id,
             position: position + 1,
@@ -286,6 +295,12 @@ const AdminBlogs = () => {
     toast({ title: 'Copied', description: `${selectedBlogs.length} link(s) copied to clipboard` });
   };
 
+  const copySingleLink = (slug: string) => {
+    const link = `${getBaseUrl()}/blog/${slug}`;
+    navigator.clipboard.writeText(link);
+    toast({ title: 'Copied', description: 'Link copied to clipboard' });
+  };
+
   const exportCSV = (all: boolean) => {
     const dataToExport = all ? blogs : blogs.filter(b => selectedIds.includes(b.id));
     const headers = ['Serial #', 'Title', 'Slug', 'Author', 'Category', 'Status', 'Link'];
@@ -331,6 +346,13 @@ const AdminBlogs = () => {
     }
   };
 
+  // Get the /wr number for a selected search
+  const getWrNumber = (index: number) => {
+    const sortedSelected = [...selectedRelatedSearches].sort((a, b) => a - b);
+    const position = sortedSelected.indexOf(index);
+    return position >= 0 ? position + 1 : null;
+  };
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
@@ -367,65 +389,6 @@ const AdminBlogs = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-sm font-medium text-foreground">Content * (100 words)</label>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={generateContent}
-                    disabled={generatingContent || !formData.title.trim()}
-                    className="gap-1"
-                  >
-                    {generatingContent ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="w-4 h-4" />
-                    )}
-                    Generate AI Content
-                  </Button>
-                </div>
-                <Textarea 
-                  value={formData.content} 
-                  onChange={(e) => setFormData({ ...formData, content: e.target.value })} 
-                  rows={6} 
-                  required 
-                  placeholder="Enter blog content or generate with AI (100 words)..."
-                />
-              </div>
-
-              {/* Generated Related Searches */}
-              {generatedRelatedSearches.length > 0 && (
-                <div className="border border-border rounded-lg p-4 bg-muted/50">
-                  <label className="text-sm font-medium text-foreground block mb-2">
-                    Select Related Searches (max 4) - Click to select/deselect
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {generatedRelatedSearches.map((search, index) => (
-                      <button
-                        key={index}
-                        type="button"
-                        onClick={() => toggleRelatedSearch(index)}
-                        className={`p-2 text-sm rounded-md border text-left transition-colors ${
-                          selectedRelatedSearches.includes(index)
-                            ? 'bg-primary text-primary-foreground border-primary'
-                            : 'bg-background border-border hover:bg-muted'
-                        }`}
-                      >
-                        <span className="font-medium mr-1">#{selectedRelatedSearches.indexOf(index) + 1 || '-'}</span>
-                        {search}
-                        {selectedRelatedSearches.includes(index) && (
-                          <span className="ml-1 text-xs">→ /wr={selectedRelatedSearches.indexOf(index) + 1}</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Selected: {selectedRelatedSearches.length}/4
-                  </p>
-                </div>
-              )}
 
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -462,6 +425,74 @@ const AdminBlogs = () => {
                   </div>
                 )}
               </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-sm font-medium text-foreground">Content * (100 words)</label>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={generateContent}
+                    disabled={generatingContent || !formData.title.trim()}
+                    className="gap-1"
+                  >
+                    {generatingContent ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4" />
+                    )}
+                    Generate AI Content
+                  </Button>
+                </div>
+                <Textarea 
+                  value={formData.content} 
+                  onChange={(e) => setFormData({ ...formData, content: e.target.value })} 
+                  rows={6} 
+                  required 
+                  placeholder="Enter blog content or generate with AI (100 words)..."
+                />
+              </div>
+
+              {/* Generated Related Searches - Editable */}
+              {generatedRelatedSearches.length > 0 && (
+                <div className="border border-border rounded-lg p-4 bg-muted/50">
+                  <label className="text-sm font-medium text-foreground block mb-2">
+                    Edit & Select Related Searches for Landing Page (max 4)
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    You can edit the search text before saving. Selected searches will appear on landing page.
+                  </p>
+                  <div className="space-y-2">
+                    {generatedRelatedSearches.map((search, index) => {
+                      const wrNumber = getWrNumber(index);
+                      const isSelected = selectedRelatedSearches.includes(index);
+                      return (
+                        <div key={index} className="flex items-center gap-2">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleRelatedSearch(index)}
+                          />
+                          <Input
+                            value={search}
+                            onChange={(e) => updateRelatedSearch(index, e.target.value)}
+                            className={`flex-1 ${isSelected ? 'border-primary' : ''}`}
+                          />
+                          {isSelected && wrNumber && (
+                            <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded whitespace-nowrap">
+                              → /wr={wrNumber}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {selectedRelatedSearches.length}/4 selected
+                  </p>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-foreground">Author Image URL</label>
@@ -489,31 +520,33 @@ const AdminBlogs = () => {
       </div>
 
       {/* Bulk Actions Bar */}
-      {selectedIds.length > 0 && (
-        <div className="mb-4 p-3 bg-muted rounded-lg flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-medium">{selectedIds.length} of {blogs.length} selected</span>
-          <div className="flex gap-2 ml-auto flex-wrap">
-            <Button variant="outline" size="sm" onClick={() => exportCSV(true)}>
-              <Download className="w-4 h-4 mr-1" />Export All CSV
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => exportCSV(false)}>
-              <Download className="w-4 h-4 mr-1" />Export Selected ({selectedIds.length})
-            </Button>
-            <Button variant="outline" size="sm" onClick={copyLinks}>
-              <Copy className="w-4 h-4 mr-1" />Copy
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => bulkUpdateStatus('published')}>
-              <CheckCircle className="w-4 h-4 mr-1" />Activate
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => bulkUpdateStatus('draft')}>
-              <XCircle className="w-4 h-4 mr-1" />Deactivate
-            </Button>
-            <Button variant="destructive" size="sm" onClick={bulkDelete}>
-              <Trash2 className="w-4 h-4 mr-1" />Delete ({selectedIds.length})
-            </Button>
-          </div>
+      <div className="mb-4 p-3 bg-muted rounded-lg flex items-center gap-2 flex-wrap">
+        <span className="text-sm font-medium">{selectedIds.length} of {blogs.length} selected</span>
+        <div className="flex gap-2 ml-auto flex-wrap">
+          <Button variant="outline" size="sm" onClick={() => exportCSV(true)}>
+            <Download className="w-4 h-4 mr-1" />Export All CSV
+          </Button>
+          {selectedIds.length > 0 && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => exportCSV(false)}>
+                <Download className="w-4 h-4 mr-1" />Export Selected ({selectedIds.length})
+              </Button>
+              <Button variant="outline" size="sm" onClick={copyLinks}>
+                <Copy className="w-4 h-4 mr-1" />Copy
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => bulkUpdateStatus('published')}>
+                <CheckCircle className="w-4 h-4 mr-1" />Activate
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => bulkUpdateStatus('draft')}>
+                <XCircle className="w-4 h-4 mr-1" />Deactivate
+              </Button>
+              <Button variant="destructive" size="sm" onClick={bulkDelete}>
+                <Trash2 className="w-4 h-4 mr-1" />Delete ({selectedIds.length})
+              </Button>
+            </>
+          )}
         </div>
-      )}
+      </div>
       
       {loading ? (
         <div className="space-y-4">
@@ -530,11 +563,11 @@ const AdminBlogs = () => {
                     onCheckedChange={toggleSelectAll}
                   />
                 </th>
-                <th className="text-left p-4 text-sm font-medium text-foreground">#</th>
                 <th className="text-left p-4 text-sm font-medium text-foreground">Title</th>
+                <th className="text-left p-4 text-sm font-medium text-foreground">Slug</th>
                 <th className="text-left p-4 text-sm font-medium text-foreground">Category</th>
-                <th className="text-left p-4 text-sm font-medium text-foreground">Author</th>
                 <th className="text-left p-4 text-sm font-medium text-foreground">Status</th>
+                <th className="text-left p-4 text-sm font-medium text-foreground">Active</th>
                 <th className="text-left p-4 text-sm font-medium text-foreground">Actions</th>
               </tr>
             </thead>
@@ -547,19 +580,33 @@ const AdminBlogs = () => {
                       onCheckedChange={() => toggleSelect(blog.id)}
                     />
                   </td>
-                  <td className="p-4 text-sm text-muted-foreground">{blog.serial_number}</td>
-                  <td className="p-4 text-sm text-foreground">{blog.title}</td>
+                  <td className="p-4 text-sm text-foreground font-medium">{blog.title}</td>
+                  <td className="p-4 text-sm text-muted-foreground">{blog.slug}</td>
                   <td className="p-4 text-sm text-muted-foreground">{blog.categories?.name || '-'}</td>
-                  <td className="p-4 text-sm text-muted-foreground">{blog.author}</td>
                   <td className="p-4">
                     <span className={`text-xs px-2 py-1 rounded ${blog.status === 'published' ? 'bg-green-500/20 text-green-600' : 'bg-yellow-500/20 text-yellow-600'}`}>
                       {blog.status}
                     </span>
                   </td>
                   <td className="p-4">
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(blog)}><Edit className="w-4 h-4" /></Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(blog.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                    <div className={`w-10 h-5 rounded-full ${blog.status === 'published' ? 'bg-primary' : 'bg-muted'} relative cursor-pointer`}>
+                      <div className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all ${blog.status === 'published' ? 'right-0.5' : 'left-0.5'}`} />
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => copySingleLink(blog.slug)} title="Copy Link">
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => window.open(`/blog/${blog.slug}`, '_blank')} title="View">
+                        <ExternalLink className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleEdit(blog)} title="Edit">
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(blog.id)} title="Delete">
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
                     </div>
                   </td>
                 </tr>

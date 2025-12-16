@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Sparkles, Loader2 } from "lucide-react";
 
 interface RelatedSearch {
   id: string;
@@ -26,6 +26,7 @@ const AdminPreLanding = () => {
   const [webResults, setWebResults] = useState<WebResult[]>([]);
   const [filteredResults, setFilteredResults] = useState<WebResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const [generatingAI, setGeneratingAI] = useState(false);
   
   const [selectedSearch, setSelectedSearch] = useState("");
   const [selectedResult, setSelectedResult] = useState("");
@@ -122,6 +123,47 @@ const AdminPreLanding = () => {
     }
   };
 
+  const generateWithAI = async () => {
+    if (!selectedResult) {
+      toast({ title: 'Error', description: 'Please select a web result first', variant: 'destructive' });
+      return;
+    }
+
+    const webResult = filteredResults.find(r => r.id === selectedResult);
+    if (!webResult) return;
+
+    setGeneratingAI(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-blog-content', {
+        body: { title: webResult.name + ' - ' + webResult.title, type: 'prelanding' }
+      });
+
+      if (error) throw error;
+      
+      if (data.headline) {
+        setPreLandingData(prev => ({
+          ...prev,
+          headline: data.headline || prev.headline,
+          description: data.description || prev.description,
+          button_text: data.button_text || prev.button_text,
+          main_image_url: data.main_image_url || prev.main_image_url,
+        }));
+        toast({ title: 'Success', description: 'Pre-landing content generated!' });
+      } else if (data.error) {
+        throw new Error(data.error);
+      }
+    } catch (error: any) {
+      console.error('Error generating pre-landing:', error);
+      toast({ 
+        title: 'Error', 
+        description: error.message || 'Failed to generate pre-landing content', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setGeneratingAI(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedResult) {
@@ -189,18 +231,37 @@ const AdminPreLanding = () => {
         {selectedSearch && (
           <>
             <h2 className="text-lg font-semibold mt-6 mb-4">Step 2: Select Web Result</h2>
-            <Select value={selectedResult} onValueChange={setSelectedResult}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select web result" />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredResults.map((r) => (
-                  <SelectItem key={r.id} value={r.id}>
-                    {r.name} - {r.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-4 items-end">
+              <div className="flex-1">
+                <Select value={selectedResult} onValueChange={setSelectedResult}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select web result" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredResults.map((r) => (
+                      <SelectItem key={r.id} value={r.id}>
+                        {r.name} - {r.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {selectedResult && (
+                <Button 
+                  onClick={generateWithAI}
+                  disabled={generatingAI}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  {generatingAI ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4" />
+                  )}
+                  Generate with AI
+                </Button>
+              )}
+            </div>
           </>
         )}
         
@@ -227,30 +288,42 @@ const AdminPreLanding = () => {
         <div className="bg-card rounded-xl border border-border p-6">
           <h2 className="text-lg font-semibold mb-4">Edit Pre-Landing Page</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Logo URL</label>
-              <Input 
-                value={preLandingData.logo_url} 
-                onChange={(e) => setPreLandingData({ ...preLandingData, logo_url: e.target.value })} 
-                placeholder="https://example.com/logo.png"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Logo URL</label>
+                <Input 
+                  value={preLandingData.logo_url} 
+                  onChange={(e) => setPreLandingData({ ...preLandingData, logo_url: e.target.value })} 
+                  placeholder="https://example.com/logo.png"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Main Image URL</label>
+                <Input 
+                  value={preLandingData.main_image_url} 
+                  onChange={(e) => setPreLandingData({ ...preLandingData, main_image_url: e.target.value })}
+                  placeholder="https://example.com/main-image.jpg"
+                />
+              </div>
             </div>
             
-            <div>
-              <label className="text-sm font-medium">Main Image URL</label>
-              <Input 
-                value={preLandingData.main_image_url} 
-                onChange={(e) => setPreLandingData({ ...preLandingData, main_image_url: e.target.value })}
-                placeholder="https://example.com/main-image.jpg"
-              />
-            </div>
+            {preLandingData.main_image_url && (
+              <div className="rounded-lg overflow-hidden border border-border max-w-xs">
+                <img 
+                  src={preLandingData.main_image_url} 
+                  alt="Main preview" 
+                  className="w-full h-32 object-cover"
+                  onError={(e) => (e.currentTarget.style.display = 'none')}
+                />
+              </div>
+            )}
             
             <div>
-              <label className="text-sm font-medium">Headline</label>
+              <label className="text-sm font-medium">Headline *</label>
               <Input 
                 value={preLandingData.headline} 
                 onChange={(e) => setPreLandingData({ ...preLandingData, headline: e.target.value })}
-                placeholder="Exciting offer!"
+                placeholder="Get Exclusive Access!"
               />
             </div>
             
@@ -268,27 +341,28 @@ const AdminPreLanding = () => {
               <Input placeholder="Enter your email" disabled />
             </div>
             
-            <div>
-              <label className="text-sm font-medium">CTA Button Text</label>
-              <Input 
-                value={preLandingData.button_text} 
-                onChange={(e) => setPreLandingData({ ...preLandingData, button_text: e.target.value })}
-              />
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium">Background Color</label>
-              <div className="flex gap-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">CTA Button Text</label>
                 <Input 
-                  type="color" 
-                  value={preLandingData.background_color} 
-                  onChange={(e) => setPreLandingData({ ...preLandingData, background_color: e.target.value })}
-                  className="w-20"
+                  value={preLandingData.button_text} 
+                  onChange={(e) => setPreLandingData({ ...preLandingData, button_text: e.target.value })}
                 />
-                <Input 
-                  value={preLandingData.background_color} 
-                  onChange={(e) => setPreLandingData({ ...preLandingData, background_color: e.target.value })}
-                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Background Color</label>
+                <div className="flex gap-2">
+                  <Input 
+                    type="color" 
+                    value={preLandingData.background_color} 
+                    onChange={(e) => setPreLandingData({ ...preLandingData, background_color: e.target.value })}
+                    className="w-14 p-1 h-10"
+                  />
+                  <Input 
+                    value={preLandingData.background_color} 
+                    onChange={(e) => setPreLandingData({ ...preLandingData, background_color: e.target.value })}
+                  />
+                </div>
               </div>
             </div>
             
@@ -308,6 +382,7 @@ const AdminPreLanding = () => {
                   type="color" 
                   value={preLandingData.headline_color} 
                   onChange={(e) => setPreLandingData({ ...preLandingData, headline_color: e.target.value })}
+                  className="h-10"
                 />
               </div>
               <div>
@@ -316,6 +391,7 @@ const AdminPreLanding = () => {
                   type="color" 
                   value={preLandingData.description_color} 
                   onChange={(e) => setPreLandingData({ ...preLandingData, description_color: e.target.value })}
+                  className="h-10"
                 />
               </div>
               <div>
@@ -324,6 +400,7 @@ const AdminPreLanding = () => {
                   type="color" 
                   value={preLandingData.button_color} 
                   onChange={(e) => setPreLandingData({ ...preLandingData, button_color: e.target.value })}
+                  className="h-10"
                 />
               </div>
             </div>
@@ -348,7 +425,7 @@ const AdminPreLanding = () => {
               </div>
             </div>
             
-            <Button type="submit" className="w-full">Update Pre-Landing Page</Button>
+            <Button type="submit" className="w-full">Save Pre-Landing Page</Button>
           </form>
         </div>
       )}
